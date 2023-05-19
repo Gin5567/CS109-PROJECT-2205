@@ -15,14 +15,7 @@ import java.util.ArrayList;
 import model.ChessPiece;
 import model.Chessboard;
 import view.ChessGameFrame;
-
-/**
- * Controller is the connection between model and view,
- * when a Controller receive a request from a view, the Controller
- * analyzes and then hands over to the model for processing
- * [in this demo the request methods are onPlayerClickCell() and onPlayerClickChessPiece()]
- *
-*/
+import view.ChessboardComponent;
 public class GameController implements GameListener {
 
     private Chessboard model;
@@ -33,7 +26,9 @@ public class GameController implements GameListener {
     public JLabel timeLabel;
     public ArrayList<Step> undoList = new ArrayList<>();
     private ChessboardPoint selectedPoint;
+
     public int turn = 1 ;
+    public int RemainingTime = 60;
     public GameController(ChessboardComponent view, Chessboard model) {
         this.view = view;
         this.model = model;
@@ -45,6 +40,42 @@ public class GameController implements GameListener {
     }
     public int getTurn() {
         return turn;
+    }
+    public void RunTimer() {
+        synchronized (this) {
+            while (!win()) {
+
+                while (RemainingTime > 0) {
+                    try {
+                        Thread.sleep(1000);
+                        RemainingTime--;
+                        chessGameFrame.getTimerLabel().setText("Time: " + RemainingTime);
+                        if (RemainingTime == 0) {
+                            if (currentPlayer == PlayerColor.BLUE) {
+                                currentPlayer = PlayerColor.RED;
+                                turn++;
+                                chessGameFrame.getPlayerLabel().setText("Player: " + currentPlayer);
+                                chessGameFrame.getTurnLabel().setText("Turn: " + turn);
+                            } else if (currentPlayer == PlayerColor.RED) {
+                                currentPlayer = PlayerColor.BLUE;
+                                turn++;
+                                chessGameFrame.getPlayerLabel().setText("Player: " + currentPlayer);
+                                chessGameFrame.getTurnLabel().setText("Turn: " + turn);
+
+                            }
+                        }
+
+
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+                RemainingTime = 60;
+            }
+        }
+    }
+    public void setRemainingTime(int remainingTime) {
+        RemainingTime = remainingTime;
     }
     private boolean win() {
         if (model.getAllChessPieces(currentPlayer) == 0) {
@@ -478,6 +509,14 @@ public class GameController implements GameListener {
         }
     }
     public void resetGame() {
+        Thread timerThread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                RunTimer();
+            }
+        });
+        timerThread.start();
+        RemainingTime = 60;
         model.steps.clear();
         undoList.clear();
         turn = 1;
@@ -498,6 +537,14 @@ public class GameController implements GameListener {
     }
 
     public void reset() {
+        Thread timerThread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                RunTimer();
+            }
+        });
+        timerThread.start();
+        RemainingTime = 60;
         for (int i = 0; i < 9; i++) {
             for (int j = 0; j < 7; j++) {
                 ChessboardPoint point = new ChessboardPoint(i, j);
@@ -514,39 +561,46 @@ public class GameController implements GameListener {
     }
 
     public void undo() {
-        undoList.add(model.steps.get(model.steps.size() - 1));
-        model.steps.remove(model.steps.size() - 1);
-        ArrayList<Step> list = model.steps;
+        if(model.steps.size() != 0) {
+            undoList.add(model.steps.get(model.steps.size() - 1));
+            model.steps.remove(model.steps.size() - 1);
+            ArrayList<Step> list = model.steps;
             turn = 1;
             chessGameFrame.getTurnLabel().setText("Turn: " + turn);
-            chessGameFrame.getPlayerLabel().setText("Player: " + (currentPlayer  == PlayerColor.BLUE ? "RED" : "BLUE"));
+            chessGameFrame.getPlayerLabel().setText("Player: " + (currentPlayer == PlayerColor.BLUE ? "RED" : "BLUE"));
 
-        reset();
-        for (int i = 0; i < list.size(); i++) {
-            Step step = list.get(i);
-            ChessboardPoint src = step.src;
-            ChessboardPoint dest = step.dest;
-            PlayerColor color = step.color;
-            boolean isCapture = step.captured != null;
-            if (!isCapture) {
-                model.setChessPiece(dest, model.removeChessPiece(src));
-                view.setChessComponentAtGrid(dest, view.removeChessComponentAtGrid(src));
-                selectedPoint = null;
-                currentPlayer = color;
-                swapColor();
-                view.repaint();
-                view.revalidate();
-            } else {
-                model.removeChessPiece(dest);
-                model.setChessPiece(dest, model.removeChessPiece(src));
-                view.removeChessComponentAtGrid(dest);
-                view.setChessComponentAtGrid(dest, view.removeChessComponentAtGrid(src));
-                currentPlayer = color;
-                swapColor();
-                view.repaint();
-                view.revalidate();
+
+            reset();
+            if (list.size() != 0) {
+
+
+                for (int i = 0; i < list.size(); i++) {
+                    Step step = list.get(i);
+                    ChessboardPoint src = step.src;
+                    ChessboardPoint dest = step.dest;
+                    PlayerColor color = step.color;
+                    boolean isCapture = step.captured != null;
+                    if (!isCapture) {
+                        model.setChessPiece(dest, model.removeChessPiece(src));
+                        view.setChessComponentAtGrid(dest, view.removeChessComponentAtGrid(src));
+                        selectedPoint = null;
+                        currentPlayer = color;
+                        swapColor();
+                        view.repaint();
+                        view.revalidate();
+                    } else {
+                        model.removeChessPiece(dest);
+                        model.setChessPiece(dest, model.removeChessPiece(src));
+                        view.removeChessComponentAtGrid(dest);
+                        view.setChessComponentAtGrid(dest, view.removeChessComponentAtGrid(src));
+                        currentPlayer = color;
+                        swapColor();
+                        view.repaint();
+                        view.revalidate();
+                    }
+
+                }
             }
-
         }
     }
 
@@ -649,7 +703,7 @@ public class GameController implements GameListener {
     public boolean Load(File file){
         if (!file.getName().endsWith(".txt")){
             JOptionPane.showMessageDialog(null, "File Error",
-                    "文件后缀错误", JOptionPane.ERROR_MESSAGE);
+                    "文件后缀错误,并非.txt", JOptionPane.ERROR_MESSAGE);
             reset();
             return false;
         }
@@ -686,7 +740,7 @@ public class GameController implements GameListener {
                     String[] chess= readList.get(i).split(" ");
                     if (chess.length != 7){
                         JOptionPane.showMessageDialog(null, "File Error",
-                                "棋盘错误，并非9*7", JOptionPane.ERROR_MESSAGE);
+                                "棋盘规格错误，大小并非9*7", JOptionPane.ERROR_MESSAGE);
                         reset();
                         return false;
                     }
@@ -700,7 +754,7 @@ public class GameController implements GameListener {
                 }
             } catch (Exception e) {
                 JOptionPane.showMessageDialog(null, "File Error",
-                        "棋盘错误，并非9*7", JOptionPane.ERROR_MESSAGE);
+                        "棋盘规格错误，大小并非9*7", JOptionPane.ERROR_MESSAGE);
                 reset();
                 return false;
             }
