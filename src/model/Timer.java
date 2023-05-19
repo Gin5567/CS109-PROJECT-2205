@@ -1,37 +1,68 @@
 package model;
-import controller.GameController;
+
+import controller.Controller;
+
 public class Timer extends Thread {
-    private int PlayerTime = 60;
-    private PlayerColor player;
-    public GameController gameController = GameController.getInstance();
+    public static int time = 45;
+    public Controller controller;
+    public int RemainingTime;
 
-
-    public void run() {
-
-        synchronized (this) {
-            while (true) {
-                player = GameController.currentPlayer;
-                while (PlayerTime > 0) {
-                    PlayerTime--;
+    @Override
+    public void run(){
+        synchronized (this){
+            while (true){
+                PlayerColor player = controller.currentPlayer;
+                boolean b = true;
+                while(time > 0) {
+                    time--;
                     try {
                         Thread.sleep(1000);
-                        gameController.timeLabel.setText("Time: " + PlayerTime);
-                        if (GameController.currentPlayer != player) {
-                            gameController.swapColor();
+                        controller.timeLabel.setText("Time: " + time);
+                        if (controller.currentPlayer != player){
+                            controller.swapColor();
+                            b = false;
                             break;
                         }
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
                 }
-                PlayerTime = 60;
+                time = 45;
+
+                if (b){
+                    BoardPoint[] points = controller.eastAIGetPoint();
+                    BoardPoint src = points[0];
+                    BoardPoint dest = points[1];
+
+                    if (controller.board.getChessPieceAt(dest) == null){
+                        controller.board.move(src, dest);
+                        controller.view.setChessViewAtGrid(dest, controller.view.removeChessViewAtGrid(src));
+                    } else {
+                        controller.board.capture(src, dest);
+                        controller.view.removeChessViewAtGrid(dest);
+                        controller.view.setChessViewAtGrid(dest, controller.view.removeChessViewAtGrid(src));
+                    }
+                    controller.canStepPoints = null;
+                    controller.setCanStepFalse();
+                    controller.swapColor();
+                    controller.view.repaint();
+                    controller.view.gridViews[dest.getRow()][dest.getCol()].revalidate();
+                    controller.checkWin();
+                    if (controller.winner != null){
+                        controller.doWin();
+                        controller.reset();
+                    }
+                } else {
+                    controller.swapColor();
+                }
+
             }
         }
+
     }
-    public void setPlayerTime(int playerTime) {
-        PlayerTime = playerTime;
+
+    public Timer(Controller controller){
+        this.controller = controller;
     }
-    public int getPlayerTime() {
-        return PlayerTime;
-    }
+
 }
