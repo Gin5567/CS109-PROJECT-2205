@@ -2,30 +2,40 @@ package controller;
 
 
 import listener.GameListener;
-import model.PlayerColor;
-import model.ChessboardPoint;
-import model.Timer;
+import model.*;
 import view.*;
 import java.io.*;
 import javax.swing.JOptionPane;
 
 import javax.swing.*;
-import model.Step;
 import java.util.ArrayList;
-import model.ChessPiece;
-import model.Chessboard;
+
+import model.PlayerColor;
 import view.ChessGameFrame;
 import view.ChessboardComponent;
+import Audio.AudioPlayer;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+
+
+import java.util.stream.IntStream;
+
 public class GameController implements GameListener {
 
     private Chessboard model;
     private ChessboardComponent view;
     private ChessGameFrame chessGameFrame = ChessGameFrame.instance();
+
     public static PlayerColor currentPlayer;
     public PlayerColor winner;
     public JLabel timeLabel;
     public ArrayList<Step> undoList = new ArrayList<>();
     private ChessboardPoint selectedPoint;
+    private int BlueWinCount = 0;
+    private int RedWinCount = 0;
+    public int counter;
+    private AudioPlayer audioPlayer = new AudioPlayer();
+    public UserManager userManager = new UserManager();
 
     public int turn = 1 ;
     public int RemainingTime = 60;
@@ -33,11 +43,14 @@ public class GameController implements GameListener {
         this.view = view;
         this.model = model;
         this.currentPlayer = PlayerColor.BLUE;
-
         view.registerController(this);
         view.initiateChessComponent(model);
         view.repaint();
+
     }
+
+
+
     public int getTurn() {
         return turn;
     }
@@ -88,12 +101,35 @@ public class GameController implements GameListener {
         }
     }
     public void doWin() {
-        JOptionPane.showMessageDialog(view, (winner == PlayerColor.BLUE ? "RED" : "BLUE") + " Win !");
-        View.changePanel("Menu");
+        audioPlayer.playSFX("src/SFX/Win.wav");
+        if (winner == PlayerColor.BLUE) {
+            BlueWinCount++;
+        } else if (winner == PlayerColor.RED){
+            RedWinCount++;
+        }
+        Object[] options = {"Restart", "Back to Menu"};
+        int selection = JOptionPane.showOptionDialog(view, (winner == PlayerColor.BLUE ? "RED" : "BLUE") + " Win !", "游戏结束！", JOptionPane.YES_NO_OPTION, JOptionPane.INFORMATION_MESSAGE, null, options, options[0]);
+
+        if (selection == JOptionPane.YES_OPTION) {
+            resetGame();
+        } else if (selection == JOptionPane.NO_OPTION) {
+            View.changePanel("Menu");
+        }
     }
     public void doWinAlter() {
-        JOptionPane.showMessageDialog(view, (winner == PlayerColor.BLUE ? "BLUE" : "RED") + " Win !");
-        View.changePanel("Menu");
+        audioPlayer.playSFX("src/SFX/Win.wav");
+        if (winner == PlayerColor.BLUE) {
+            BlueWinCount++;
+        } else if (winner == PlayerColor.RED){
+            RedWinCount++;
+        }
+        Object[] options = {"Restart", "Back to Menu"};
+        int selection = JOptionPane.showOptionDialog(view, (winner == PlayerColor.BLUE ? "RED" : "BLUE") + " Win !", "游戏结束！", JOptionPane.YES_NO_OPTION, JOptionPane.INFORMATION_MESSAGE, null, options, options[0]);
+        if (selection == JOptionPane.YES_OPTION) {
+            resetGame();
+        } else if (selection == JOptionPane.NO_OPTION) {
+            View.changePanel("Menu");
+        }
     }
     public void swapColor() {
         if(win()) {
@@ -116,6 +152,7 @@ public class GameController implements GameListener {
             model.moveChessPiece(selectedPoint, point);
             view.setChessComponentAtGrid(point, view.removeChessComponentAtGrid(selectedPoint));
             selectedPoint = null;
+            audioPlayer.play("src/SFX/Chess.wav");
             swapColor();
             view.repaint();
             view.revalidate();
@@ -137,12 +174,14 @@ public class GameController implements GameListener {
             component.repaint();
         } else {
             if (model.isValidMove(selectedPoint, point)) {
+                audioPlayer.play("src/SFX/Chess.wav");
                 model.moveChessPiece(selectedPoint, point);
                 view.setChessComponentAtGrid(point, view.removeChessComponentAtGrid(selectedPoint));
                 selectedPoint = null;
                 swapColor();
                 view.repaint();
             } else if (model.isValidCapture(selectedPoint, point)) {
+
                 setMovableGridsUnhighlighted();
                 model.captureChessPiece(selectedPoint, point);
                 view.removeChessComponentAtGrid(point);
@@ -171,12 +210,14 @@ public class GameController implements GameListener {
             component.repaint();
         } else {
             if (model.isValidMove(selectedPoint, point)) {
+                audioPlayer.play("src/SFX/Chess.wav");
                 model.moveChessPiece(selectedPoint, point);
                 view.setChessComponentAtGrid(point, view.removeChessComponentAtGrid(selectedPoint));
                 selectedPoint = null;
                 swapColor();
                 view.repaint();
             } else if (model.isValidCapture(selectedPoint, point)) {
+
                 setMovableGridsUnhighlighted();
                 model.captureChessPiece(selectedPoint, point);
                 view.removeChessComponentAtGrid(point);
@@ -207,6 +248,7 @@ public class GameController implements GameListener {
             component.repaint();
         } else {
             if (model.isValidMove(selectedPoint, point)) {
+                audioPlayer.play("src/SFX/Chess.wav");
                 model.moveChessPiece(selectedPoint, point);
                 view.setChessComponentAtGrid(point, view.removeChessComponentAtGrid(selectedPoint));
                 selectedPoint = null;
@@ -242,9 +284,11 @@ public class GameController implements GameListener {
             component.repaint();
         } else {
             if (model.isValidMove(selectedPoint, point)) {
+                audioPlayer.play("src/SFX/Chess.wav");
                 model.moveChessPiece(selectedPoint, point);
                 view.setChessComponentAtGrid(point, view.removeChessComponentAtGrid(selectedPoint));
                 selectedPoint = null;
+
                 swapColor();
                 view.repaint();
             } else if (model.isValidCapture(selectedPoint, point)) {
@@ -277,6 +321,7 @@ public class GameController implements GameListener {
             component.repaint();
         } else {
             if (model.isValidMove(selectedPoint, point)) {
+                audioPlayer.play("src/SFX/Chess.wav");
                 model.moveChessPiece(selectedPoint, point);
                 view.setChessComponentAtGrid(point, view.removeChessComponentAtGrid(selectedPoint));
                 selectedPoint = null;
@@ -312,12 +357,14 @@ public class GameController implements GameListener {
             component.repaint();
         } else {
             if (model.isValidMove(selectedPoint, point)) {
+                audioPlayer.play("src/SFX/Chess.wav");
                 model.moveChessPiece(selectedPoint, point);
                 view.setChessComponentAtGrid(point, view.removeChessComponentAtGrid(selectedPoint));
                 selectedPoint = null;
                 swapColor();
                 view.repaint();
             } else if (model.isValidCapture(selectedPoint, point)) {
+
                 setMovableGridsUnhighlighted();
                 model.captureChessPiece(selectedPoint, point);
                 view.removeChessComponentAtGrid(point);
@@ -347,12 +394,14 @@ public class GameController implements GameListener {
             component.repaint();
         } else {
             if (model.isValidMove(selectedPoint, point)) {
+                audioPlayer.play("src/SFX/Chess.wav");
                 model.moveChessPiece(selectedPoint, point);
                 view.setChessComponentAtGrid(point, view.removeChessComponentAtGrid(selectedPoint));
                 selectedPoint = null;
                 swapColor();
                 view.repaint();
             } else if (model.isValidCapture(selectedPoint, point)) {
+
                 setMovableGridsUnhighlighted();
                 model.captureChessPiece(selectedPoint, point);
                 view.removeChessComponentAtGrid(point);
@@ -382,12 +431,14 @@ public class GameController implements GameListener {
             component.repaint();
         } else {
             if (model.isValidMove(selectedPoint, point)) {
+                audioPlayer.play("src/SFX/Chess.wav");
                 model.moveChessPiece(selectedPoint, point);
                 view.setChessComponentAtGrid(point, view.removeChessComponentAtGrid(selectedPoint));
                 selectedPoint = null;
                 swapColor();
                 view.repaint();
             } else if (model.isValidCapture(selectedPoint, point)) {
+
                 setMovableGridsUnhighlighted();
                 model.captureChessPiece(selectedPoint, point);
                 view.removeChessComponentAtGrid(point);
@@ -416,12 +467,15 @@ public class GameController implements GameListener {
             component.repaint();
         } else {
             if (model.isValidMove(selectedPoint, point)) {
+                audioPlayer.play("src/SFX/Chess.wav");
                 model.moveChessPiece(selectedPoint, point);
                 view.setChessComponentAtGrid(point, view.removeChessComponentAtGrid(selectedPoint));
                 selectedPoint = null;
                 swapColor();
                 view.repaint();
             } else if (model.isValidCapture(selectedPoint, point)) {
+
+
                 setMovableGridsUnhighlighted();
                 model.captureChessPiece(selectedPoint, point);
                 view.removeChessComponentAtGrid(point);
@@ -450,12 +504,14 @@ public class GameController implements GameListener {
             component.repaint();
         } else {
             if (model.isValidMove(selectedPoint, point)) {
+                audioPlayer.play("src/SFX/Chess.wav");
                 model.moveChessPiece(selectedPoint, point);
                 view.setChessComponentAtGrid(point, view.removeChessComponentAtGrid(selectedPoint));
                 selectedPoint = null;
                 swapColor();
                 view.repaint();
             } else if (model.isValidCapture(selectedPoint, point)) {
+
                 setMovableGridsUnhighlighted();
                 model.captureChessPiece(selectedPoint, point);
                 view.removeChessComponentAtGrid(point);
@@ -509,6 +565,7 @@ public class GameController implements GameListener {
         }
     }
     public void resetGame() {
+        System.out.println(Settings.getAIDifficulty());
         Thread timerThread = new Thread(new Runnable() {
             @Override
             public void run() {
@@ -534,6 +591,7 @@ public class GameController implements GameListener {
         view.repaint();
         view.revalidate();
         currentPlayer = PlayerColor.BLUE;
+        chessGameFrame.getPlayerLabel().setText("Player: " + currentPlayer);
     }
 
     public void reset() {
@@ -664,6 +722,26 @@ public class GameController implements GameListener {
         }
         return true;
     }
+    public void Replay() {
+        int counter = model.steps.size();
+        IntStream.range(0, counter).forEach(i -> undo()); // 先撤销一次操作
+
+        Timer timer = new Timer(1000, new ActionListener() {
+            private int count = 0;
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (count < counter) {
+                    redo();
+                    count++;
+                } else {
+                    ((Timer) e.getSource()).stop();
+                }
+            }
+        });
+        timer.start();
+    }
+
     public void Save(String fileName) {
         String location = "save\\" + fileName + ".txt";
         File file = new File(location);
@@ -797,7 +875,7 @@ public class GameController implements GameListener {
                 }
             }
         } catch (Exception ex){
-            //ex.printStackTrace();
+
             JOptionPane.showMessageDialog(null, "No File",
                     "错误", JOptionPane.ERROR_MESSAGE);
             reset();
