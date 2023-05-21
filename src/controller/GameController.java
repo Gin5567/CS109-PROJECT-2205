@@ -4,17 +4,20 @@ package controller;
 import listener.GameListener;
 import model.PlayerColor;
 import model.ChessboardPoint;
-import model.Timer;
 import view.*;
 import java.io.*;
+import model.Chessboard;
 import javax.swing.JOptionPane;
 
 import javax.swing.*;
 import model.Step;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Random;
+
 import model.ChessPiece;
-import model.Chessboard;
-import view.ChessGameFrame;
+
+import static java.util.Collections.max;
 
 /**
  * Controller is the connection between model and view,
@@ -25,57 +28,27 @@ import view.ChessGameFrame;
 */
 public class GameController implements GameListener {
 
+
     private Chessboard model;
     private ChessboardComponent view;
-    private ChessGameFrame chessGameFrame = ChessGameFrame.instance();
     public static PlayerColor currentPlayer;
     public PlayerColor winner;
     public JLabel timeLabel;
     public ArrayList<Step> undoList = new ArrayList<>();
+    private Thread thread;
     private ChessboardPoint selectedPoint;
-    public int turn = 1 ;
+    public boolean AI;
     public GameController(ChessboardComponent view, Chessboard model) {
         this.view = view;
         this.model = model;
         this.currentPlayer = PlayerColor.BLUE;
 
         view.registerController(this);
+
         view.initiateChessComponent(model);
         view.repaint();
     }
-    public int getTurn() {
-        return turn;
-    }
-    private boolean win() {
-        if (model.getAllChessPieces(currentPlayer) == 0) {
-            return true;
-        }
-        if (currentPlayer == PlayerColor.BLUE) {
-            return model.getChessPieceOwner(new ChessboardPoint(0, 3)).equals(PlayerColor.BLUE);
-        } else {
-            return model.getChessPieceOwner(new ChessboardPoint(8, 3)).equals(PlayerColor.RED);
-        }
-    }
-    public void doWin() {
-        JOptionPane.showMessageDialog(view, (winner == PlayerColor.BLUE ? "RED" : "BLUE") + " Win !");
-        View.changePanel("Menu");
-    }
-    public void doWinAlter() {
-        JOptionPane.showMessageDialog(view, (winner == PlayerColor.BLUE ? "BLUE" : "RED") + " Win !");
-        View.changePanel("Menu");
-    }
     public void swapColor() {
-        if(win()) {
-            if (model.getAllChessPieces(currentPlayer) != 0) {
-                doWin();
-            }
-            else if (model.getAllChessPieces(currentPlayer) == 0) {
-                doWinAlter();
-            }
-        }
-        turn++;
-        chessGameFrame.getTurnLabel().setText("Turn: " + turn);
-        chessGameFrame.getPlayerLabel().setText("Player: " + (currentPlayer == PlayerColor.BLUE ? "RED" : "BLUE"));
         currentPlayer = currentPlayer == PlayerColor.BLUE ? PlayerColor.RED : PlayerColor.BLUE;
     }
     @Override
@@ -88,6 +61,9 @@ public class GameController implements GameListener {
             swapColor();
             view.repaint();
             view.revalidate();
+            if (AI) {
+                easyAI();
+            }
         }
     }
     @Override
@@ -446,7 +422,19 @@ public class GameController implements GameListener {
         }
         return instance;
     }
-
+    private boolean win() {
+        if (model.getAllChessPieces(currentPlayer) == 0) {
+            return false;
+        }
+        if (currentPlayer == PlayerColor.BLUE) {
+            return model.getChessPieceOwner(new ChessboardPoint(0, 3)).equals(PlayerColor.BLUE);
+        } else {
+            return model.getChessPieceOwner(new ChessboardPoint(8, 3)).equals(PlayerColor.RED);
+        }
+    }
+    public void doWin() {
+        JOptionPane.showMessageDialog(view, (winner == PlayerColor.BLUE ? "BLUE" : "RED") + " Win !");
+    }
     public void setMovableGridsHighlighted(ChessboardPoint point) {
         for (int i = 0; i < 9; i++) {
             for (int j = 0; j < 7; j++) {
@@ -480,8 +468,6 @@ public class GameController implements GameListener {
     public void resetGame() {
         model.steps.clear();
         undoList.clear();
-        turn = 1;
-        chessGameFrame.getTurnLabel().setText("Turn: " + turn);
         for (int i = 0; i < 9; i++) {
             for (int j = 0; j < 7; j++) {
                 ChessboardPoint point = new ChessboardPoint(i, j);
@@ -517,10 +503,6 @@ public class GameController implements GameListener {
         undoList.add(model.steps.get(model.steps.size() - 1));
         model.steps.remove(model.steps.size() - 1);
         ArrayList<Step> list = model.steps;
-            turn = 1;
-            chessGameFrame.getTurnLabel().setText("Turn: " + turn);
-            chessGameFrame.getPlayerLabel().setText("Player: " + (currentPlayer  == PlayerColor.BLUE ? "RED" : "BLUE"));
-
         reset();
         for (int i = 0; i < list.size(); i++) {
             Step step = list.get(i);
@@ -546,7 +528,6 @@ public class GameController implements GameListener {
                 view.repaint();
                 view.revalidate();
             }
-
         }
     }
 
@@ -584,10 +565,6 @@ public class GameController implements GameListener {
     public static GameController getInstance() {
         return instance;
     }
-
-
-
-
     private static String animalToString(ChessPiece chess){
         if (chess == null || chess.getName().equals("Trap") || chess.getName().equals("Hole")) return "+";
         else if (chess.getName().equals("Elephant")) return "E";
@@ -726,7 +703,6 @@ public class GameController implements GameListener {
                     selectedPoint = null;
                     swapColor();
                     view.repaint();
-
                 } else {
                     if (!model.isValidCapture(src, dest)){
                         JOptionPane.showMessageDialog(null, "File Error",
@@ -743,12 +719,128 @@ public class GameController implements GameListener {
                 }
             }
         } catch (Exception ex){
-            //ex.printStackTrace();
             JOptionPane.showMessageDialog(null, "No File",
                     "错误", JOptionPane.ERROR_MESSAGE);
             reset();
         }
         return true;
     }
-
+    public ArrayList<ChessboardPoint> getCanStepPoints(ChessboardPoint src) {
+        ArrayList<ChessboardPoint> list = new ArrayList<>();
+        for (int i = 0; i < 9; i++) {
+            for (int j = 0; j < 7; j++) {
+                ChessboardPoint dest = new ChessboardPoint(i, j);
+                if (model.isValidMove(src, dest)){
+                    list.add(dest);
+                }
+                if (model.isValidCapture(src, dest)){
+                    list.add(dest);
+                }
+            }
+        }
+        return list;
+    }
+    public ChessboardPoint getBestPoints(ChessboardPoint src) {
+        ArrayList<ChessboardPoint> list = new ArrayList<>();
+        ArrayList<Integer> Score = new ArrayList<>();
+        for (int i = 0; i < 9; i++) {
+            for (int j = 0; j < 7; j++) {
+                ChessboardPoint dest = new ChessboardPoint(i, j);
+                int score = 10;
+                if (model.isValidMove(src, dest)){
+                    ArrayList<ChessboardPoint> canMove = getCanStepPoints(dest);
+                    score = score + canMove.size();
+                    list.add(dest);
+                    Score.add(score);
+                } else if (model.isValidCapture(src, dest)){
+                    ArrayList<ChessboardPoint> canMove = getCanStepPoints(dest);
+                    score = score + canMove.size() + 3;
+                    list.add(dest);
+                    Score.add(score);
+                }
+            }
+        }
+        ChessboardPoint bestPoint = null;
+        for (int i = 0; i < Score.size(); i++) {
+            if (Score.get(i) == Collections.max(Score)){
+                bestPoint = list.get(i);
+            }
+        }
+        return bestPoint;
+    }
+    public void easyAI() {
+        ArrayList<ChessboardPoint> canMove = new ArrayList<>();
+        thread = new Thread(() -> {
+            try {
+                Thread.sleep(300);
+            } catch (Exception e){
+                e.printStackTrace();
+            }
+            for (int i = 0; i < 9; i++) {
+                for (int j = 0; j < 7; j++) {
+                    if (model.getGrid()[i][j].getPiece() != null && model.getGrid()[i][j].getPiece().getOwner() == currentPlayer){
+                        ArrayList<ChessboardPoint> list = getCanStepPoints(new ChessboardPoint(i, j));
+                        if (list.size() != 0) canMove.add(new ChessboardPoint(i, j));
+                    }
+                }
+            }
+            Random random = new Random();
+            ChessboardPoint src = canMove.get(random.nextInt(canMove.size()));
+            ArrayList<ChessboardPoint> list = getCanStepPoints(src);
+            ChessboardPoint dest = list.get(random.nextInt(list.size()));
+            if (model.getChessPieceAt(dest) == null){
+                model.moveChessPiece(src, dest);
+                view.setChessComponentAtGrid(dest, view.removeChessComponentAtGrid(src));
+            } else {
+                model.captureChessPiece(src, dest);
+                view.removeChessComponentAtGrid(dest);
+                view.setChessComponentAtGrid(dest, view.removeChessComponentAtGrid(src));
+            }
+            swapColor();
+            view.repaint();
+            if (win()){
+                doWin();
+                reset();
+            }
+        });
+        thread.start();
+    }
+    public void normalAI() {
+        ArrayList<ChessboardPoint> canMove = new ArrayList<>();
+        thread = new Thread(() -> {
+            try {
+                Thread.sleep(300);
+            } catch (Exception e){
+                e.printStackTrace();
+            }
+            for (int i = 0; i < 9; i++) {
+                for (int j = 0; j < 7; j++) {
+                    if (model.getGrid()[i][j].getPiece() != null && model.getGrid()[i][j].getPiece().getOwner() == currentPlayer){
+                        ArrayList<ChessboardPoint> list = getCanStepPoints(new ChessboardPoint(i, j));
+                        if (list.size() != 0) {
+                            canMove.add(new ChessboardPoint(i, j));
+                        }
+                    }
+                }
+            }
+            Random random = new Random();
+            ChessboardPoint src = canMove.get(random.nextInt(canMove.size()));
+            ChessboardPoint dest = getBestPoints(src);
+            if (model.getChessPieceAt(dest) == null){
+                model.moveChessPiece(src, dest);
+                view.setChessComponentAtGrid(dest, view.removeChessComponentAtGrid(src));
+            } else {
+                model.captureChessPiece(src, dest);
+                view.removeChessComponentAtGrid(dest);
+                view.setChessComponentAtGrid(dest, view.removeChessComponentAtGrid(src));
+            }
+            swapColor();
+            view.repaint();
+            if (win()){
+                doWin();
+                reset();
+            }
+        });
+        thread.start();
+    }
 }
